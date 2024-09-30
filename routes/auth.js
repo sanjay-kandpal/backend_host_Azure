@@ -128,19 +128,27 @@ router.post('/logout', async (req, res) => {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    await DeviceSession.findOneAndUpdate(
-      { user: decoded.userId, deviceId },
-      { isActive: false }
-    );
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      await DeviceSession.findOneAndUpdate(
+        { user: decoded.userId, deviceId },
+        { isActive: false, token: null }
+      );
 
-    res.json({ message: 'Logged out successfully' });
+      res.json({ message: 'Logged out successfully' });
+    } catch (jwtError) {
+      // If token is invalid or expired, we still want to clear the session
+      await DeviceSession.findOneAndUpdate(
+        { deviceId },
+        { isActive: false, token: null }
+      );
+      res.json({ message: 'Logged out successfully' });
+    }
   } catch (error) {
     console.error('Error logging out:', error);
     res.status(500).json({ message: 'Error logging out', error: error.message });
   }
 });
-
 // Add a new route to get all active sessions for a user
 router.get('/sessions', async (req, res) => {
   try {
